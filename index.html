@@ -239,7 +239,6 @@ E|-----------------------------------|`;
 
         // --- COMPONENTS ---
         
-        // MiniPlayer Component
         const MiniPlayer = ({ routine, onResume, timeLeft }) => {
             const formatTime = (seconds) => {
                 const mins = Math.floor(seconds / 60);
@@ -719,8 +718,8 @@ E|-----------------------------------|`;
                 onSave(data, finalCat);
             };
             return (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4 animate-fade-in" onClick={onCancel}>
-                    <div className="bg-theme-card border border-theme rounded-xl p-6 w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[110] p-4 animate-fade-in" onClick={onCancel}>
+                    <div className="bg-theme-card border border-theme rounded-xl p-6 w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh] flex flex-col h-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-4">
                              <h3 className="text-xl font-bold text-theme-main">Modify Exercise</h3>
                              <button onClick={onCancel} className="text-theme-muted hover:text-theme-main"><X size={20}/></button>
@@ -950,7 +949,7 @@ E|-----------------------------------|`;
                 const savedLog = localStorage.getItem('guitarApp_log');
                 if (savedLog) setLogContent(savedLog);
                 const savedHistory = localStorage.getItem('guitarApp_sessionHistory');
-                if (savedHistory) { try { setSessionHistory(JSON.parse(savedHistory)); } catch(e) { console.error(e); } }
+                if (savedHistory) { try { setSessionHistory(JSON.parse(savedHistory)); } catch(e) {} }
             }, []);
 
             const toggleTheme = () => {
@@ -998,7 +997,7 @@ E|-----------------------------------|`;
                 setSessionStepIndex(0);
                 setSessionTimeLeft(activeRoutine.steps[0].duration * 60);
                 setSessionNotesMap({});
-                setSessionTimerActive(false);
+                setSessionTimerActive(false); // User must press Play
                 setView('SESSION'); 
             };
             
@@ -1022,9 +1021,9 @@ E|-----------------------------------|`;
 
             const handleSessionPrev = () => {
                 if (sessionStepIndex > 0) {
-                    const prevIndex = sessionStepIndex - 1;
-                    setSessionStepIndex(prevIndex);
-                    setSessionTimeLeft(activeRoutine.steps[prevIndex].duration * 60);
+                    const prev = sessionStepIndex - 1;
+                    setSessionStepIndex(prev);
+                    setSessionTimeLeft(activeRoutine.steps[prev].duration * 60);
                     setSessionTimerActive(false);
                 }
             };
