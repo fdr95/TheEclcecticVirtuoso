@@ -1,0 +1,1193 @@
+<!-- 
+  THE ECLECTIC VIRTUOSO - Practice Companion App
+  Copyright (c) 2024 [Inserisci Qui Il Tuo Nome]
+  All rights reserved.
+  
+  This software is proprietary and confidential. 
+  Unauthorized copying of this file, via any medium is strictly prohibited.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Eclectic Virtuoso - Practice Companion</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        /* THEME VARIABLES */
+        :root {
+            /* Dark Mode */
+            --bg-main: #09090b;
+            --bg-card: #18181b;
+            --bg-element: #27272a;
+            --bg-hover: #3f3f46;
+            --border: #3f3f46; 
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --accent-purple: #a855f7;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --dot-std: #71717a; 
+            --mini-player-bg: #27272a;
+        }
+
+        .light-mode {
+            /* Light Mode */
+            --bg-main: #e2e4e8;   
+            --bg-card: #f8fafc;   
+            --bg-element: #f1f5f9; 
+            --bg-hover: #e2e8f0;
+            --border: #cbd5e1; 
+            --text-main: #0f172a; 
+            --text-muted: #64748b; 
+            --accent-purple: #7c3aed;
+            --accent-blue: #2563eb;
+            --accent-red: #dc2626;
+            --dot-std: #94a3b8; 
+            --mini-player-bg: #ffffff;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-main); 
+            color: var(--text-main); 
+            overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Utility Classes */
+        .bg-theme-main { background-color: var(--bg-main); }
+        .bg-theme-card { background-color: var(--bg-card); }
+        .bg-theme-element { background-color: var(--bg-element); }
+        .border-theme { border-color: var(--border); }
+        .text-theme-main { color: var(--text-main); }
+        .text-theme-muted { color: var(--text-muted); }
+        .hover-bg-theme-element:hover { background-color: var(--bg-element); }
+        .hover-bg-theme-hover:hover { background-color: var(--bg-hover); }
+        
+        /* Custom Scrollbar */
+        .tab-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .tab-scroll::-webkit-scrollbar-track { background: transparent; }
+        .tab-scroll::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 4px; }
+        
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+
+        @keyframes pulse-subtle {
+            0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(168, 85, 247, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
+        }
+        .pulse-effect { animation: pulse-subtle 2s infinite; }
+
+        .dragging { opacity: 0.5; border-color: var(--accent-purple); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- ICONS ---
+        const Icon = ({ children, className, size = 24, ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                {children}
+            </svg>
+        );
+
+        const Play = (props) => <Icon {...props}><polygon points="5 3 19 12 5 21 5 3"></polygon></Icon>;
+        const Pause = (props) => <Icon {...props}><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></Icon>;
+        const SkipForward = (props) => <Icon {...props}><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></Icon>;
+        const SkipBack = (props) => <Icon {...props}><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></Icon>;
+        const Save = (props) => <Icon {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1-2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></Icon>;
+        const Zap = (props) => <Icon {...props}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></Icon>;
+        const Flame = (props) => <Icon {...props}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-2.24-4.05-2-6 1.1-1.2 5.24 1.2 5.5 1.6.12.18-.36.96-.28 1.48.5 3.48 4.78 5.4 3.78 8.42A6 6 0 0 1 8.5 21a6.002 6.002 0 0 1-4.04-10.74c1.1.48 2.06 1.48 3.04 2.74z"></path></Icon>;
+        const BatteryCharging = (props) => <Icon {...props}><path d="M5 18H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.19M15 6h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3.19"></path><line x1="23" y1="13" x2="23" y2="11"></line><polyline points="11 6 7 12 13 12 9 18"></polyline></Icon>;
+        const ChevronLeft = (props) => <Icon {...props}><polyline points="15 18 9 12 15 6"></polyline></Icon>;
+        const Download = (props) => <Icon {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></Icon>;
+        const CheckCircle = (props) => <Icon {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></Icon>;
+        const Plus = (props) => <Icon {...props}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></Icon>;
+        const Edit2 = (props) => <Icon {...props}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></Icon>;
+        const Trash2 = (props) => <Icon {...props}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></Icon>;
+        const ArrowUp = (props) => <Icon {...props}><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></Icon>;
+        const ArrowDown = (props) => <Icon {...props}><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></Icon>;
+        const RotateCcw = (props) => <Icon {...props}><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></Icon>;
+        const Info = (props) => <Icon {...props}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></Icon>;
+        const AlertTriangle = (props) => <Icon {...props}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></Icon>;
+        const Hand = (props) => <Icon {...props}><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"></path><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"></path><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"></path><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"></path></Icon>;
+        const Layers = (props) => <Icon {...props}><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></Icon>;
+        const MoreVertical = (props) => <Icon {...props}><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></Icon>;
+        const BookOpen = (props) => <Icon {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></Icon>;
+        const FolderInput = (props) => <Icon {...props}><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5-7-5-4 4z"></path></Icon>;
+        const Search = (props) => <Icon {...props}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></Icon>;
+        const GripVertical = (props) => <Icon {...props}><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></Icon>;
+        const HomeIcon = (props) => <Icon {...props}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></Icon>;
+        const FileText = (props) => <Icon {...props}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></Icon>;
+        const Watch = (props) => <Icon {...props}><circle cx="12" cy="12" r="7"></circle><polyline points="12 9 12 12 13.5 13.5"></polyline><path d="M16.51 17.35l-.35 3.83a2 2 0 0 1-2 1.82H9.83a2 2 0 0 1-2-1.82l-.35-3.83m.01-10.7l.35-3.83A2 2 0 0 1 9.83 1h4.35a2 2 0 0 1 2 1.82l.35 3.83"></path></Icon>;
+        const Settings = (props) => <Icon {...props}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></Icon>;
+        const MailIcon = (props) => <Icon {...props}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></Icon>;
+        const X = (props) => <Icon {...props}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></Icon>;
+        const Minus = (props) => <Icon {...props}><line x1="5" y1="12" x2="19" y2="12"></line></Icon>;
+        const Maximize = (props) => <Icon {...props}><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></Icon>;
+
+        // --- DATA & LIBRARY ---
+        
+        const BLANK_TAB = `E|-----------------------------------|
+B|-----------------------------------|
+G|-----------------------------------|
+D|-----------------------------------|
+A|-----------------------------------|
+E|-----------------------------------|`;
+
+        const TABS = {
+            snake: `    D U D  D U D  D U D  D U D\nE|-----------------------------------|\nB|-----------------------------------|\nG|-----------------------7-9-10------|\nD|---------------7-8-10--------------|\nA|--------7-8-10---------------------|\nE|-7-8-10----------------------------|`,
+            rake: `       (Rake)    (Snap!)\nE|------x--------10~~~----|--8h10p8---------|\nB|------x-10-----10~~~----|---------10-8----|\nG|------x----10-----------|--------------10-|\nD|---12-------------------|-----------------|`,
+            chromatic: `    Sweep Down..........      Tap\nE|----------10-13-16/19-----T22p19p16...|\nB|-------12-----------------------------|\nG|----13--------------------------------|\nD|-15-----------------------------------|`,
+            fuzz: `   Rhythmic & Aggressive (16th notes)\nG|--7-7-7-7--9-9-9-9--10-10-10-10--12\--|\nD|--x-x-x-x--x-x-x-x--x--x--x--x---x----|\nA|--5-5-5-5--7-7-7-7--8--8--8--8---10\--|`,
+            spider: `   1 2 3 4 (Chromatic Climb)\nE|-------------------------1-2-3-4-|\nB|-----------------1-2-3-4---------|\nG|---------1-2-3-4-----------------|\nD|-1-2-3-4-------------------------|`,
+            pentatonic_seq: `   Groups of 6 (Descending)\nE|-8-5-----------------------------------|\nB|-----8-5-------------------------------|\nG|---------7-5---7-5---------------------|\nD|-------------------7-5---7-5-----------|\nA|-----------------------------7-5-------|`,
+            triad_pairs: `   Triads C Maj -> D Min (String Set 2-3-4)\nG|--5--7--|\nD|--5--7--|\nA|--7--8--|`,
+            asturias: `   T  M  I  M   T  M  I  M (Thumb Pedal)\nE|--------------------------------|\nB|----0-----0------0-----0--------|\nG|-------4------------4-----------|\nD|-2------------1-----------------|\nA|--------------------------------|\nE|--------------------------------|`,
+            sultans_triad: `   D  M+A  D  M+A  (D=Downstroke, M+A=Fingers)\nE|-----5-------5--------3------3--|\nB|-----6-------6--------5------5--|\nG|-----7-------7--------5------5--|\nD|--7-------7--------5------5-----|`,
+            legato_trill: `   30 sec per pair (e.g. 2-3)\n   h p h p h p h p \nE|-5-6-5-6-5-6-5-6...| (Feel the burn!)`
+        };
+
+        const INITIAL_EXERCISE_LIBRARY = {
+            Warmup: [
+                { title: 'Chromatic Warm-up (Spider)', duration: 5, type: 'Neutral', desc: '1-2-3-4 pattern. Focus on independence.', tab: TABS.spider },
+                { title: 'Forearm Stretching', duration: 3, type: 'Neutral', desc: 'Without guitar. Stretch extensors and flexors gently.' },
+                { title: 'Independence "Spider Walk"', duration: 10, type: 'Neutral', desc: 'Move one finger at a time while keeping others pressed.' },
+                { title: 'PIMA Warmup (Open Strings)', duration: 5, type: 'Neutral', desc: 'Thumb, Index, Middle, Ring on open strings in time.' },
+            ],
+            Shred: [
+                { title: 'Economy Picking "Snake"', duration: 10, type: 'Metal', desc: 'Fast scales (3 notes per string). Smooth string changes.', tab: TABS.snake },
+                { title: 'Sweep Picking (3 Strings)', duration: 10, type: 'Metal', desc: 'Minor triads on high strings. "Rest Stroke" motion.', tab: TABS.chromatic },
+                { title: 'Sweep Picking (5 Strings)', duration: 15, type: 'Metal', desc: 'Extended arpeggios. Focus on left hand muting.' },
+                { title: 'Tremolo Picking Endurance', duration: 5, type: 'Metal', desc: 'Constant speed on a single string (16th notes).', tab: TABS.fuzz },
+                { title: 'Legato "Power Trills"', duration: 10, type: 'Metal', desc: 'Infinite trills to build left hand muscles.', tab: TABS.legato_trill },
+                { title: 'Synchronization Drill', duration: 10, type: 'Metal', desc: '1-2-3-4 fast. If the pick misses the note, slow down.' },
+            ],
+            Fingerstyle: [
+                { title: 'Classical Fingerstyle Intro', duration: 15, type: 'Clean', desc: 'Bass pedal with Thumb, melody with Index/Middle.', tab: TABS.asturias },
+                { title: 'Fast Triad Alchemy', duration: 15, type: 'Clean', desc: 'Fast triads using Pick or Thumb + Fingers.', tab: TABS.sultans_triad },
+                { title: 'Right Hand Independence', duration: 10, type: 'Clean', desc: 'Giuliani arpeggios or folk patterns without pick.' },
+                { title: 'Dynamic Rake', duration: 10, type: 'Clean', desc: 'Muted sweeps and dynamic snap.', tab: TABS.rake },
+            ],
+            Theory: [
+                { title: 'Triad Visualization', duration: 10, type: 'Fusion', desc: 'Find the same triad in 5 different positions.', tab: TABS.triad_pairs },
+                { title: 'Harmonic Minor Scale', duration: 10, type: 'Fusion', desc: 'Improvise using the raised 7th degree.' },
+            ]
+        };
+
+        const DEFAULT_ROUTINES = {
+            'shred_protocol': {
+                id: 'shred_protocol',
+                title: 'Shred Protocol',
+                duration: 60,
+                description: 'High intensity routine for speed, picking, and raw strength.',
+                color: 'text-red-500',
+                icon: 'Zap',
+                steps: [
+                    { ...INITIAL_EXERCISE_LIBRARY.Warmup[0], duration: 5 },
+                    { ...INITIAL_EXERCISE_LIBRARY.Shred[5], duration: 10, title: 'Synchronization (16ths)' },
+                    { ...INITIAL_EXERCISE_LIBRARY.Shred[0], duration: 10 },
+                    { ...INITIAL_EXERCISE_LIBRARY.Shred[4], duration: 10 },
+                    { ...INITIAL_EXERCISE_LIBRARY.Shred[2], duration: 15 },
+                    { title: 'Solo Application', duration: 10, type: 'Metal', desc: 'Study a solo section focused on speed.' }
+                ]
+            },
+            'fingerstyle_academy': {
+                id: 'fingerstyle_academy',
+                title: 'Fingerstyle Academy',
+                duration: 60,
+                description: 'Free-hand study: Classical style, Modern Rock, and independence.',
+                color: 'text-amber-400',
+                icon: 'Hand',
+                steps: [
+                    { ...INITIAL_EXERCISE_LIBRARY.Warmup[3], duration: 5 },
+                    { ...INITIAL_EXERCISE_LIBRARY.Warmup[2], duration: 10 },
+                    { ...INITIAL_EXERCISE_LIBRARY.Fingerstyle[0], duration: 15, title: 'Classical Intro' },
+                    { ...INITIAL_EXERCISE_LIBRARY.Fingerstyle[1], duration: 15, title: 'Dynamic Triads' },
+                    { title: 'Improvisation "Touch"', duration: 15, type: 'Clean', desc: 'Improvise on a slow track using only fingers. Focus on dynamics.' }
+                ]
+            },
+            '30min': {
+                id: '30min',
+                title: 'Quick Maintenance',
+                duration: 30,
+                description: 'Balanced mix for busy days.',
+                color: 'text-emerald-400',
+                icon: 'BatteryCharging',
+                steps: [
+                    INITIAL_EXERCISE_LIBRARY.Warmup[0],
+                    { ...INITIAL_EXERCISE_LIBRARY.Shred[0], title: 'Economy Picking Drills' },
+                    INITIAL_EXERCISE_LIBRARY.Fingerstyle[3],
+                    { ...INITIAL_EXERCISE_LIBRARY.Shred[3], title: 'High Energy Riff', desc: 'Sustained 16th note riffs for endurance.'}
+                ]
+            }
+        };
+
+        // --- COMPONENTS ---
+        
+        // MiniPlayer Component
+        const MiniPlayer = ({ routine, onResume, timeLeft }) => {
+            const formatTime = (seconds) => {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            };
+            return (
+                <div 
+                    onClick={onResume}
+                    className="fixed bottom-20 left-4 right-4 bg-theme-card border border-var(--accent-purple) rounded-xl shadow-2xl p-3 flex items-center justify-between z-[90] cursor-pointer pulse-effect"
+                    style={{ backgroundColor: 'var(--mini-player-bg)', borderColor: 'var(--accent-purple)' }}
+                >
+                    <div className="flex items-center overflow-hidden">
+                        <div className="w-10 h-10 rounded-full bg-theme-element flex items-center justify-center mr-3 shrink-0">
+                            <Play size={16} className="text-theme-main fill-current" />
+                        </div>
+                        <div className="flex flex-col overflow-hidden mr-4">
+                            <span className="text-[10px] text-var(--accent-purple) font-bold uppercase tracking-wider" style={{ color: 'var(--accent-purple)' }}>Session Active</span>
+                            <span className="text-sm font-bold text-theme-main truncate">{routine.title}</span>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                         <div className="font-mono text-xl font-bold text-theme-main">
+                             {formatTime(timeLeft)}
+                         </div>
+                        <button className="p-2 text-theme-muted hover:text-theme-main">
+                            <Maximize size={20} />
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const MetronomeWidget = ({ isOpen, onClose }) => {
+            const [bpm, setBpm] = useState(120);
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [beats, setBeats] = useState([1, 0, 0, 0]); 
+            const [currentBeat, setCurrentBeat] = useState(-1);
+            
+            const bpmRef = useRef(bpm);
+            useEffect(() => { bpmRef.current = bpm; }, [bpm]);
+            
+            const beatsRef = useRef(beats);
+            useEffect(() => { beatsRef.current = beats; }, [beats]);
+
+            const audioCtxRef = useRef(null);
+            const nextNoteTimeRef = useRef(0);
+            const currentBeatRef = useRef(0);
+            const timerIDRef = useRef(null);
+            
+            const lookahead = 25.0; 
+            const scheduleAheadTime = 0.1; 
+
+            const toggleBeatType = (index) => {
+                const newBeats = [...beats];
+                newBeats[index] = (newBeats[index] + 1) % 3; 
+                setBeats(newBeats);
+            };
+
+            const addBeat = () => {
+                if (beats.length < 12) setBeats([...beats, 0]);
+            };
+
+            const removeBeat = () => {
+                if (beats.length > 1) setBeats(beats.slice(0, -1));
+            };
+
+            const playSound = (time, beatIndex, type) => {
+                const drawTime = (time - audioCtxRef.current.currentTime) * 1000;
+                setTimeout(() => {
+                    setCurrentBeat(beatIndex);
+                }, Math.max(0, drawTime));
+
+                if (type === 2) return; 
+
+                const osc = audioCtxRef.current.createOscillator();
+                const gainNode = audioCtxRef.current.createGain();
+
+                osc.connect(gainNode);
+                gainNode.connect(audioCtxRef.current.destination);
+
+                if (type === 1) {
+                    osc.frequency.value = 1200; 
+                    gainNode.gain.value = 1;
+                } else {
+                    osc.frequency.value = 800; 
+                    gainNode.gain.value = 0.5;
+                }
+
+                osc.start(time);
+                osc.stop(time + 0.05);
+            };
+
+            const nextNote = () => {
+                const secondsPerBeat = 60.0 / bpmRef.current; 
+                nextNoteTimeRef.current += secondsPerBeat;
+                
+                currentBeatRef.current++;
+                if (currentBeatRef.current >= beatsRef.current.length) { 
+                    currentBeatRef.current = 0;
+                }
+            };
+
+            const scheduler = () => {
+                while (nextNoteTimeRef.current < audioCtxRef.current.currentTime + scheduleAheadTime) {
+                    const currentBeatIndex = currentBeatRef.current;
+                    const currentBeatType = beatsRef.current[currentBeatIndex];
+                    playSound(nextNoteTimeRef.current, currentBeatIndex, currentBeatType);
+                    nextNote();
+                }
+                timerIDRef.current = setTimeout(scheduler, lookahead);
+            };
+
+            const togglePlay = () => {
+                if (isPlaying) {
+                    clearTimeout(timerIDRef.current);
+                    setIsPlaying(false);
+                    setCurrentBeat(-1);
+                } else {
+                    if (!audioCtxRef.current) {
+                        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    if (audioCtxRef.current.state === 'suspended') {
+                         audioCtxRef.current.resume();
+                    }
+                    
+                    setIsPlaying(true);
+                    currentBeatRef.current = 0;
+                    nextNoteTimeRef.current = audioCtxRef.current.currentTime + 0.05;
+                    scheduler();
+                }
+            };
+
+            useEffect(() => {
+                return () => clearTimeout(timerIDRef.current);
+            }, []);
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-[80] bg-theme-card border border-theme shadow-2xl rounded-2xl p-4 w-72 animate-fade-in flex flex-col items-center">
+                    <div className="flex justify-between w-full mb-4 items-center">
+                        <h4 className="text-theme-main font-bold text-sm flex items-center"><Watch size={16} className="mr-1 text-theme-muted"/> Metronome</h4>
+                    </div>
+
+                    <div className="flex flex-wrap justify-center gap-2 mb-4">
+                        {beats.map((type, idx) => (
+                            <button 
+                                key={idx}
+                                onClick={() => toggleBeatType(idx)}
+                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                                    idx === currentBeat ? 'scale-125 border-white shadow-[0_0_10px_currentColor]' : 'border-transparent'
+                                }`}
+                                style={{
+                                    backgroundColor: type === 1 ? 'var(--accent-blue)' : type === 2 ? 'transparent' : 'var(--dot-std)',
+                                    borderColor: type === 2 ? 'var(--text-muted)' : 'transparent',
+                                    borderStyle: type === 2 ? 'dashed' : 'solid',
+                                    color: idx === currentBeat ? '#fff' : 'inherit'
+                                }}
+                            >
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center gap-4 mb-4">
+                         <button onClick={removeBeat} className="p-1 px-2 bg-theme-element rounded text-theme-muted hover:text-theme-main hover:bg-theme-hover text-xs font-bold" disabled={beats.length <= 1}>- Beat</button>
+                        <button onClick={addBeat} className="p-1 px-2 bg-theme-element rounded text-theme-muted hover:text-theme-main hover:bg-theme-hover text-xs font-bold" disabled={beats.length >= 12}>+ Beat</button>
+                    </div>
+
+                    <div className="flex items-center gap-4 w-full">
+                        <button onClick={() => setBpm(Math.max(40, bpm - 5))} className="p-2 bg-theme-element rounded-full text-theme-muted hover:text-theme-main hover:bg-theme-hover"><Minus size={16} /></button>
+                        <div className="flex-1 flex flex-col items-center"><input type="number" value={bpm} onChange={(e) => setBpm(parseInt(e.target.value) || 120)} className="w-16 bg-transparent text-center text-2xl font-bold text-theme-main outline-none"/><span className="text-[10px] text-theme-muted uppercase font-bold">BPM</span></div>
+                        <button onClick={() => setBpm(Math.min(240, bpm + 5))} className="p-2 bg-theme-element rounded-full text-theme-muted hover:text-theme-main hover:bg-theme-hover"><Plus size={16} /></button>
+                    </div>
+
+                    <button onClick={togglePlay} className={`mt-4 w-full py-2 rounded-lg font-bold flex items-center justify-center transition-colors border ${isPlaying ? 'bg-red-500/20 text-red-500 border-red-500/50' : 'bg-theme-main text-theme-main border-theme hover:bg-theme-element'}`}>{isPlaying ? <Pause size={18} /> : <Play size={18} />}</button>
+                </div>
+            );
+        };
+
+        const RoutineCard = ({ routine, onClick, onEdit, onDelete }) => {
+            const IconComponent = 
+                routine.icon === 'Zap' ? Zap : 
+                routine.icon === 'Flame' ? Flame : 
+                routine.icon === 'Hand' ? Hand :
+                BatteryCharging;
+
+            return (
+                <div 
+                    onClick={onClick}
+                    className="bg-theme-card border border-theme p-6 rounded-xl hover:border-zinc-500 hover:bg-theme-main transition-all cursor-pointer group relative flex flex-col h-full shadow-sm hover:shadow-md"
+                >
+                    <div className="flex justify-between items-start mb-4">
+                        <div className={`p-3 rounded-lg bg-theme-main ${routine.color}`}>
+                            <IconComponent />
+                        </div>
+                        <span className="text-theme-muted font-mono text-sm">{routine.duration} min</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-theme-main mb-2 group-hover:text-purple-500 transition-colors">{routine.title}</h3>
+                    <p className="text-theme-muted text-sm leading-relaxed mb-4 flex-grow">{routine.description}</p>
+                    
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <button 
+                            onClick={(e) => { e.stopPropagation(); onEdit(routine); }}
+                            className="p-2 text-theme-muted hover:text-theme-main hover:bg-theme-element rounded-full transition-colors"
+                            title="Edit Routine"
+                        >
+                            <Edit2 size={16} />
+                        </button>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onDelete(routine.id); }}
+                            className="p-2 text-theme-muted hover:text-red-400 hover:bg-theme-element rounded-full transition-colors"
+                            title="Delete Routine"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const BottomNav = ({ activeView, onViewChange, isMetronomeOpen, onToggleMetronome }) => {
+            const navItems = [
+                { id: 'HOME', icon: HomeIcon, label: 'Home' },
+                { id: 'LIBRARY', icon: BookOpen, label: 'Library' },
+                { id: 'LOG', icon: FileText, label: 'Log' },
+                // Metronome handled separately
+                { id: 'SETTINGS', icon: Settings, label: 'Settings' }
+            ];
+
+            return (
+                <div className="h-16 bg-theme-card border-t border-theme flex items-center justify-around px-4 shrink-0 z-50">
+                    {navItems.map(item => (
+                        item.id === 'SETTINGS' ? (
+                            <React.Fragment key="metronome-settings-group">
+                                <button
+                                    onClick={onToggleMetronome}
+                                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${
+                                        isMetronomeOpen ? 'text-purple-500' : 'text-theme-muted hover:text-theme-main'
+                                    }`}
+                                >
+                                    <Watch size={20} />
+                                    <span className="text-[10px] uppercase font-bold tracking-wider">Metronome</span>
+                                </button>
+                                <button
+                                    onClick={() => onViewChange(item.id)}
+                                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${
+                                        activeView === item.id || (activeView === 'PREVIEW' && item.id === 'HOME') || (activeView === 'SESSION' && item.id === 'HOME') || (activeView === 'BUILDER' && item.id === 'HOME')
+                                        ? 'text-purple-500' 
+                                        : 'text-theme-muted hover:text-theme-main'
+                                    }`}
+                                >
+                                    <item.icon size={20} />
+                                    <span className="text-[10px] uppercase font-bold tracking-wider">{item.label}</span>
+                                </button>
+                            </React.Fragment>
+                        ) : (
+                            <button
+                                key={item.id}
+                                onClick={() => onViewChange(item.id)}
+                                className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${
+                                    activeView === item.id || (activeView === 'PREVIEW' && item.id === 'HOME') || (activeView === 'SESSION' && item.id === 'HOME') || (activeView === 'BUILDER' && item.id === 'HOME')
+                                    ? 'text-purple-500' 
+                                    : 'text-theme-muted hover:text-theme-main'
+                                }`}
+                            >
+                                <item.icon size={20} />
+                                <span className="text-[10px] uppercase font-bold tracking-wider">{item.label}</span>
+                            </button>
+                        )
+                    ))}
+                </div>
+            );
+        };
+
+        const PlaceholderView = ({ title, icon: IconComponent }) => (
+            <div className="flex flex-col items-center justify-center h-full text-theme-muted animate-fade-in p-8 text-center">
+                <div className="w-16 h-16 bg-theme-card rounded-full flex items-center justify-center mb-4">
+                    <IconComponent size={32} />
+                </div>
+                <h2 className="text-2xl font-bold text-theme-main mb-2">{title}</h2>
+                <p>This feature is coming soon in a future update.</p>
+            </div>
+        );
+
+        // --- NEW LOG COMPONENT ---
+        const LogView = ({ content, onChange, history }) => {
+            const [activeTab, setActiveTab] = useState('notes'); // 'notes' or 'history'
+
+            const addTimestamp = () => {
+                const now = new Date().toLocaleString();
+                const newContent = content ? `${content}\n\n[${now}]\n` : `[${now}]\n`;
+                onChange(newContent);
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto p-6 h-full flex flex-col animate-fade-in pb-20"> 
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-3xl font-bold text-theme-main">Logbook</h2>
+                        <div className="flex bg-theme-element rounded-lg p-1">
+                            <button 
+                                onClick={() => setActiveTab('notes')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${activeTab === 'notes' ? 'bg-theme-main text-theme-main shadow-sm' : 'text-theme-muted hover:text-theme-main'}`}
+                            >
+                                My Notes
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('history')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${activeTab === 'history' ? 'bg-theme-main text-theme-main shadow-sm' : 'text-theme-muted hover:text-theme-main'}`}
+                            >
+                                Session History
+                            </button>
+                        </div>
+                    </div>
+
+                    {activeTab === 'notes' ? (
+                        <>
+                            <div className="flex justify-end mb-2">
+                                 <button 
+                                    onClick={addTimestamp}
+                                    className="px-3 py-1.5 bg-theme-element border border-theme rounded-lg text-xs font-mono text-theme-muted hover:text-theme-main transition-colors"
+                                >
+                                    + Add Date
+                                </button>
+                            </div>
+                            <textarea
+                                value={content}
+                                onChange={(e) => onChange(e.target.value)}
+                                className="flex-grow w-full bg-theme-card border border-theme rounded-xl p-4 text-theme-main focus:outline-none focus:border-purple-500 transition-colors resize-none font-mono text-sm leading-relaxed"
+                                placeholder="Write your practice notes, ideas, or session reflections here..."
+                            />
+                            <div className="text-right mt-2 text-xs text-theme-muted">
+                                Autosaved to local storage
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex-grow overflow-y-auto tab-scroll space-y-4">
+                            {history.length === 0 && (
+                                <div className="text-center text-theme-muted mt-20">No finished sessions yet.</div>
+                            )}
+                            {history.map(entry => (
+                                <div key={entry.id} className="bg-theme-card border border-theme rounded-xl p-5">
+                                    <div className="flex justify-between items-start mb-3 border-b border-theme pb-3">
+                                        <div>
+                                            <h3 className="font-bold text-theme-main">{entry.routineTitle}</h3>
+                                            <div className="text-xs text-theme-muted font-mono">{entry.date}</div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {Object.keys(entry.notes).length > 0 ? (
+                                            Object.entries(entry.notes).map(([stepIdx, note]) => {
+                                                const stepTitle = entry.steps ? entry.steps[stepIdx]?.title : `Block ${parseInt(stepIdx)+1}`;
+                                                if(!note.trim()) return null;
+                                                return (
+                                                    <div key={stepIdx} className="text-sm">
+                                                        <span className="text-purple-400 font-bold text-xs uppercase mr-2">{stepTitle}:</span>
+                                                        <span className="text-theme-muted">{note}</span>
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="text-xs text-theme-muted italic">No specific notes recorded.</div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const SettingsView = ({ onReset, isDarkMode, toggleTheme }) => (
+            <div className="max-w-md mx-auto p-6 animate-fade-in pt-10">
+                <h2 className="text-3xl font-bold text-theme-main mb-8">Settings</h2>
+                
+                <div className="space-y-6">
+                    {/* Appearance Section */}
+                    <div className="bg-theme-card border border-theme rounded-xl p-4">
+                        <h3 className="text-theme-main font-bold mb-4 flex items-center">
+                             Appearance
+                        </h3>
+                        <div className="flex items-center justify-between">
+                            <span className="text-theme-muted text-sm">Dark Mode</span>
+                            <button 
+                                onClick={toggleTheme}
+                                className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 flex items-center ${isDarkMode ? 'bg-purple-600 justify-end' : 'bg-gray-300 justify-start'}`}
+                            >
+                                <div className="w-4 h-4 bg-white rounded-full shadow-md transform transition-transform"></div>
+                            </button>
+                        </div>
+                    </div>
+
+                     {/* Feedback Section */}
+                     <div className="bg-theme-card border border-theme rounded-xl p-4">
+                        <h3 className="text-theme-main font-bold mb-4">Feedback</h3>
+                        <p className="text-theme-muted text-sm mb-4">Found a bug or have a suggestion? Let us know.</p>
+                        <a 
+                            href="mailto:feedback@eclecticvirtuoso.com?subject=App Feedback"
+                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition flex items-center justify-center"
+                        >
+                            <MailIcon size={18} className="mr-2" /> Send Feedback
+                        </a>
+                    </div>
+
+                    {/* Data Section */}
+                    <div className="bg-theme-card border border-theme rounded-xl p-4">
+                        <h3 className="text-theme-main font-bold mb-2">Data Management</h3>
+                        <p className="text-theme-muted text-sm mb-4">Resetting will delete all custom routines and restore the default library.</p>
+                        <button 
+                            onClick={onReset}
+                            className="w-full py-3 bg-red-900/20 text-red-500 border border-red-900/50 hover:bg-red-900/40 rounded-lg font-bold transition flex items-center justify-center"
+                        >
+                            <RotateCcw size={18} className="mr-2" /> Reset Application Defaults
+                        </button>
+                    </div>
+                    
+                    <div className="text-center text-theme-muted text-xs mt-8">
+                        The Eclectic Virtuoso v2.1<br/>
+                        Practice Companion<br/>
+                        <span className="block mt-2 font-semibold">Created by Federico Verdicchio</span>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const RoutinePreview = ({ routine, onStart, onBack, onEdit }) => {
+            const totalDuration = routine.steps.reduce((acc, step) => acc + parseInt(step.duration), 0);
+            return (
+                <div className="max-w-3xl mx-auto animate-fade-in pb-20">
+                    <button onClick={onBack} className="flex items-center text-theme-muted hover:text-theme-main mb-6 transition-colors">
+                        <ChevronLeft size={20} className="mr-1" /> Back to Routines
+                    </button>
+                    <div className="bg-theme-card border border-theme rounded-2xl p-8 shadow-xl">
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h1 className="text-3xl font-bold text-theme-main mb-2">{routine.title}</h1>
+                                <p className="text-theme-muted">{routine.description}</p>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-2xl font-mono font-bold text-theme-main">{totalDuration} min</div>
+                                <div className="text-xs text-theme-muted uppercase tracking-widest">Total Duration</div>
+                            </div>
+                        </div>
+                        <div className="space-y-3 mb-8">
+                            <h3 className="text-sm font-bold text-theme-muted uppercase tracking-widest mb-4">The Roadmap</h3>
+                            {routine.steps.map((step, idx) => (
+                                <div key={idx} className="flex items-center p-4 bg-theme-element/50 rounded-lg border border-theme">
+                                    <div className={`w-2 h-12 rounded-full mr-4 ${step.type === 'Metal' ? 'bg-red-500' : step.type === 'Clean' ? 'bg-amber-400' : step.type === 'Break' ? 'bg-green-500' : 'bg-zinc-500'}`}></div>
+                                    <div className="flex-1">
+                                        <div className="text-theme-main font-semibold">{step.title}</div>
+                                        <div className="text-theme-muted text-sm truncate">{step.desc}</div>
+                                    </div>
+                                    <div className="font-mono text-theme-muted text-sm">{step.duration}m</div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex gap-4">
+                            <button onClick={onStart} className="flex-1 bg-theme-main text-theme-main border border-theme font-bold py-4 rounded-xl hover:bg-theme-element transition flex justify-center items-center shadow-sm"><Play size={20} className="mr-2" /> Start Session</button>
+                            <button onClick={onEdit} className="px-6 border border-theme text-theme-muted font-bold rounded-xl hover:bg-theme-element hover:text-theme-main transition">Edit</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const EditExerciseModal = ({ exercise, originalCategory, categories, onSave, onCancel }) => {
+            const [data, setData] = useState({ ...exercise });
+            const [selectedCategory, setSelectedCategory] = useState(originalCategory);
+            const [isNewCat, setIsNewCat] = useState(false);
+            const [newCatName, setNewCatName] = useState('');
+            const handleChange = (field, value) => setData({ ...data, [field]: value });
+            const handleSaveClick = () => {
+                let finalCat = selectedCategory;
+                if (isNewCat && newCatName.trim()) finalCat = newCatName.trim();
+                onSave(data, finalCat);
+            };
+            return (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4 animate-fade-in" onClick={onCancel}>
+                    <div className="bg-theme-card border border-theme rounded-xl p-6 w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                             <h3 className="text-xl font-bold text-theme-main">Modify Exercise</h3>
+                             <button onClick={onCancel} className="text-theme-muted hover:text-theme-main"><X size={20}/></button>
+                        </div>
+                        <div className="space-y-4">
+                            <div><label className="block text-xs text-theme-muted uppercase mb-1">Title</label><input className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" value={data.title} onChange={(e) => handleChange('title', e.target.value)} /></div>
+                            <div><label className="block text-xs text-theme-muted uppercase mb-1">Category (Tab)</label>{!isNewCat ? (<div className="flex gap-2"><select className="flex-1 bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" value={selectedCategory} onChange={(e) => { if (e.target.value === '__NEW__') { setIsNewCat(true); } else { setSelectedCategory(e.target.value); } }}>{categories.filter(c => c !== 'All').map(c => (<option key={c} value={c}>{c}</option>))}<option value="__NEW__">+ Create New Category...</option></select></div>) : (<div className="flex gap-2"><input autoFocus className="flex-1 bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" placeholder="New Category Name" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} /><button onClick={() => setIsNewCat(false)} className="px-3 py-2 text-theme-muted hover:text-theme-main text-xs border border-theme rounded">Cancel</button></div>)}</div>
+                            <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-theme-muted uppercase mb-1">Duration (min)</label><input type="number" className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" value={data.duration} onChange={(e) => handleChange('duration', parseInt(e.target.value))} /></div><div><label className="block text-xs text-theme-muted uppercase mb-1">Type</label><input className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" value={data.type} onChange={(e) => handleChange('type', e.target.value)} /></div></div>
+                            <div><label className="block text-xs text-theme-muted uppercase mb-1">Description</label><textarea className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500 h-20 resize-none" value={data.desc} onChange={(e) => handleChange('desc', e.target.value)} /></div>
+                            <div><label className="block text-xs text-theme-muted uppercase mb-1">Tab / Content</label><textarea className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main font-mono text-xs outline-none focus:border-purple-500 h-24 resize-none" value={data.tab || ''} onChange={(e) => handleChange('tab', e.target.value)} /></div>
+                            <div><label className="block text-xs text-theme-muted uppercase mb-1">Image URL (Optional)</label><input className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" value={data.imageUrl || ''} placeholder="https://..." onChange={(e) => handleChange('imageUrl', e.target.value)} /></div>
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6"><button onClick={onCancel} className="px-4 py-2 text-theme-muted hover:text-theme-main transition-colors">Cancel</button><button onClick={handleSaveClick} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded font-medium shadow-sm">Save Changes</button></div>
+                    </div>
+                </div>
+            );
+        };
+
+        const MoveExerciseModal = ({ currentCategory, categories, onMove, onCancel }) => {
+            const [targetCat, setTargetCat] = useState(categories[0] === 'All' ? categories[1] : categories[0]);
+            return (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4 animate-fade-in" onClick={onCancel}>
+                    <div className="bg-theme-card border border-theme rounded-xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-theme-main mb-4">Move Exercise</h3>
+                        <p className="text-theme-muted text-sm mb-4">Select the new category for this exercise:</p>
+                        <select className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main outline-none mb-6" value={targetCat} onChange={(e) => setTargetCat(e.target.value)}>{categories.filter(c => c !== 'All' && c !== currentCategory).map(c => (<option key={c} value={c}>{c}</option>))}</select>
+                        <div className="flex justify-end gap-3"><button onClick={onCancel} className="px-3 py-2 text-theme-muted hover:text-theme-main">Cancel</button><button onClick={() => onMove(targetCat)} className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded">Move</button></div>
+                    </div>
+                </div>
+            );
+        };
+
+        const DeleteConfirmModal = ({ itemTitle, onConfirm, onCancel, isCategory = false }) => (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4 animate-fade-in" onClick={onCancel}>
+                <div className="bg-theme-card border border-theme rounded-xl p-6 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center text-red-500 mb-4"><AlertTriangle size={32} className="mr-3"/><h3 className="text-xl font-bold text-theme-main">Delete {isCategory ? 'Category' : 'Exercise'}?</h3></div>
+                    <p className="text-theme-muted mb-6 leading-relaxed">Are you sure you want to delete <strong>"{itemTitle}"</strong>? {isCategory ? " All exercises inside it will be permanently removed." : " This action cannot be undone."}</p>
+                    <div className="flex gap-3 justify-end"><button onClick={onCancel} className="px-4 py-2 text-theme-muted hover:text-theme-main transition">Cancel</button><button onClick={onConfirm} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition">Confirm Delete</button></div>
+                </div>
+            </div>
+        );
+
+        const ExerciseItem = ({ exercise, idx, catName, onAdd, onModify, onMove, onDelete, draggable, onDragStart, onDragOver, onDrop }) => {
+            const [showMenu, setShowMenu] = useState(false);
+            const menuRef = useRef(null);
+            useEffect(() => {
+                const handleClickOutside = (event) => { if (menuRef.current && !menuRef.current.contains(event.target)) setShowMenu(false); };
+                document.addEventListener("mousedown", handleClickOutside);
+                return () => document.removeEventListener("mousedown", handleClickOutside);
+            }, []);
+            const handleClick = (e) => { if (onAdd) { onAdd(exercise); } else if (onModify) { onModify(exercise, catName, idx); } };
+            return (
+                <div draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} className={`bg-theme-card p-4 rounded-lg border border-theme hover:border-zinc-500 hover:bg-theme-element cursor-pointer flex justify-between items-start transition group relative active:cursor-grabbing ${showMenu ? 'z-50' : 'z-0'}`}>
+                    {draggable && (<div className="mr-3 text-theme-muted group-hover:text-theme-main cursor-grab active:cursor-grabbing pt-1"><GripVertical size={20} /></div>)}
+                    <div onClick={handleClick} className="flex-1 pr-4"><div className="text-theme-main font-semibold">{exercise.title}</div><div className="text-theme-muted text-sm">{exercise.desc}</div></div>
+                    <div className="flex flex-col items-end gap-1"><div className="text-purple-400 font-mono text-sm whitespace-nowrap">{exercise.duration} min</div><div className="relative" ref={menuRef}><button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} className="p-1 text-theme-muted hover:text-theme-main rounded hover:bg-theme-element transition"><MoreVertical size={16} /></button>{showMenu && (<div className="absolute right-0 top-full mt-1 w-40 bg-theme-element border border-theme rounded shadow-xl z-[60] overflow-hidden"><button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onMove(exercise, catName, idx); }} className="w-full text-left px-3 py-2 text-xs text-theme-muted hover:bg-theme-hover hover:text-theme-main flex items-center"><ArrowUp className="mr-2 rotate-45" size={12} /> Move</button><button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onModify(exercise, catName, idx); }} className="w-full text-left px-3 py-2 text-xs text-theme-muted hover:bg-theme-hover hover:text-theme-main flex items-center"><Edit2 className="mr-2" size={12} /> Modify</button><button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(catName, idx, exercise.title); }} className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-900/20 flex items-center"><Trash2 className="mr-2" size={12} /> Delete</button></div>)}</div></div>
+                </div>
+            );
+        };
+
+        const LibraryManager = ({ library, onUpdateLibrary, onAddStep, mode = 'manage', onClose }) => {
+            const [selectedCategory, setSelectedCategory] = useState('All');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [isAddingCategory, setIsAddingCategory] = useState(false);
+            const [newCategoryName, setNewCategoryName] = useState('');
+            const [isEditingCategory, setIsEditingCategory] = useState(null);
+            const [editCategoryName, setEditCategoryName] = useState('');
+            const [draggedEx, setDraggedEx] = useState(null);
+            const [editModal, setEditModal] = useState(null); 
+            const [moveModal, setMoveModal] = useState(null); 
+            const [deleteModal, setDeleteModal] = useState(null); 
+
+            const handleStartAddCategory = () => { setIsAddingCategory(true); setNewCategoryName(''); };
+            const handleFinishAddCategory = () => { const name = newCategoryName.trim(); if (name && !library[name]) { onUpdateLibrary({ ...library, [name]: [] }); setSelectedCategory(name); } setIsAddingCategory(false); };
+            const handleDeleteCategoryRequest = (categoryName) => { setDeleteModal({ type: 'category', id: categoryName, name: categoryName }); };
+            const confirmDeleteCategory = () => { const categoryName = deleteModal.id; const newLibrary = { ...library }; delete newLibrary[categoryName]; onUpdateLibrary(newLibrary); if(selectedCategory === categoryName) setSelectedCategory('All'); setDeleteModal(null); };
+            const startRenameCategory = (cat) => { setIsEditingCategory(cat); setEditCategoryName(cat); };
+            const finishRenameCategory = () => { if (editCategoryName && editCategoryName !== isEditingCategory) { const { [isEditingCategory]: exercises, ...rest } = library; onUpdateLibrary({ ...rest, [editCategoryName]: exercises }); setSelectedCategory(editCategoryName); } setIsEditingCategory(null); };
+            const handleOpenModify = (ex, cat, idx) => setEditModal({ ex, cat, idx });
+            const handleSaveModify = (newData, targetCategory) => { const newLib = { ...library }; const originalCat = editModal.cat; const originalIdx = editModal.idx; if (targetCategory !== originalCat) { newLib[originalCat] = newLib[originalCat].filter((_, i) => i !== originalIdx); if (!newLib[targetCategory]) newLib[targetCategory] = []; newLib[targetCategory].push(newData); } else { newLib[originalCat][originalIdx] = newData; } onUpdateLibrary(newLib); setEditModal(null); };
+            const handleOpenMove = (ex, cat, idx) => setMoveModal({ ex, currentCat: cat, idx });
+            const handleConfirmMove = (targetCat) => { const { currentCat, idx } = moveModal; const newLib = { ...library }; const exercise = newLib[currentCat][idx]; newLib[currentCat] = newLib[currentCat].filter((_, i) => i !== idx); if (!newLib[targetCat]) newLib[targetCat] = []; newLib[targetCat].push(exercise); onUpdateLibrary(newLib); setMoveModal(null); };
+            const handleDeleteExerciseRequest = (cat, idx, title) => { setDeleteModal({ type: 'exercise', id: { cat, idx }, name: title }); };
+            const confirmDeleteExercise = () => { const { cat, idx } = deleteModal.id; const newLib = { ...library }; newLib[cat] = newLib[cat].filter((_, i) => i !== idx); onUpdateLibrary(newLib); setDeleteModal(null); };
+            const handleAddNewExercise = () => { let target = selectedCategory; if (target === 'All') target = Object.keys(library)[0] || 'Uncategorized'; if (!library[target]) onUpdateLibrary({ ...library, [target]: [] }); const newEx = { title: 'New Exercise', duration: 5, type: 'General', desc: 'Description', tab: BLANK_TAB }; const newLib = { ...library }; if(!newLib[target]) newLib[target] = []; newLib[target].push(newEx); onUpdateLibrary(newLib); const newIdx = newLib[target].length - 1; setEditModal({ ex: newEx, cat: target, idx: newIdx }); };
+            const handleDragStart = (e, cat, idx) => { setDraggedEx({ cat, idx }); e.dataTransfer.effectAllowed = "move"; };
+            const handleDragOver = (e) => { e.preventDefault(); };
+            const handleDropOnTab = (e, targetCat) => { e.preventDefault(); if (!draggedEx) return; const { cat: srcCat, idx: srcIdx } = draggedEx; if (srcCat === targetCat) return; const newLib = { ...library }; const item = newLib[srcCat][srcIdx]; newLib[srcCat] = newLib[srcCat].filter((_, i) => i !== srcIdx); if (!newLib[targetCat]) newLib[targetCat] = []; newLib[targetCat].push(item); onUpdateLibrary(newLib); setDraggedEx(null); };
+            const handleDropOnItem = (e, targetCat, targetIdx) => { e.preventDefault(); if (!draggedEx) return; if (searchTerm) return; const { cat: srcCat, idx: srcIdx } = draggedEx; if (srcCat === targetCat) { if (srcIdx === targetIdx) return; const newLib = { ...library }; const list = [...newLib[srcCat]]; const [removed] = list.splice(srcIdx, 1); list.splice(targetIdx, 0, removed); newLib[srcCat] = list; onUpdateLibrary(newLib); } setDraggedEx(null); };
+            const getDisplayedExercises = () => { let exercises = []; if (selectedCategory === 'All') { Object.keys(library).forEach(cat => { library[cat].forEach((ex, idx) => { exercises.push({ ...ex, _cat: cat, _idx: idx }); }); }); } else { exercises = library[selectedCategory]?.map((ex, idx) => ({ ...ex, _cat: selectedCategory, _idx: idx })) || []; } if (searchTerm) { return exercises.filter(ex => ex.title.toLowerCase().includes(searchTerm.toLowerCase())); } return exercises; };
+
+            return (
+                <div className="flex flex-col h-full overflow-hidden relative">
+                    <div className="p-4 border-b border-theme flex justify-between items-center bg-theme-card gap-4">
+                        <div className="flex items-center gap-2"><h3 className="text-lg font-bold text-theme-main whitespace-nowrap">Exercise Library</h3></div>
+                        <div className="relative flex-1 max-w-md"><Icon size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-theme-muted"><Search/></Icon><input className="w-full bg-theme-element border border-theme rounded-full py-1.5 pl-10 pr-4 text-sm text-theme-main focus:outline-none focus:border-purple-500 transition-colors" placeholder="Search exercises..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/></div>
+                        <button onClick={onClose} className="text-theme-muted hover:text-theme-main"><X size={20}/></button>
+                    </div>
+                    <div className="flex border-b border-theme flex-wrap items-center px-2 bg-theme-card">
+                        <button onClick={() => setSelectedCategory('All')} className={`px-4 py-3 text-sm font-mono uppercase tracking-wider whitespace-nowrap flex items-center ${selectedCategory === 'All' ? 'text-theme-main border-b-2 border-purple-500 bg-theme-element' : 'text-theme-muted hover:text-theme-main'}`}><Icon size={16} className="mr-1"><Layers/></Icon> All</button>
+                        {Object.keys(library).map(cat => (<button key={cat} onClick={() => setSelectedCategory(cat)} onDoubleClick={() => startRenameCategory(cat)} onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleDropOnTab(e, cat)} className={`px-4 py-3 text-sm font-mono uppercase tracking-wider whitespace-nowrap flex items-center group relative transition-colors ${selectedCategory === cat ? 'text-theme-main border-b-2 border-purple-500 bg-theme-element' : 'text-theme-muted hover:text-theme-main hover:bg-theme-element/50'}`}>{isEditingCategory === cat ? (<input autoFocus className="bg-transparent border-none outline-none text-theme-main w-20" value={editCategoryName} onChange={(e) => setEditCategoryName(e.target.value)} onBlur={finishRenameCategory} onKeyDown={(e) => e.key === 'Enter' && finishRenameCategory()} />) : (<>{cat}{selectedCategory === cat && (<span onClick={(e) => {e.stopPropagation(); startRenameCategory(cat)}} className="ml-2 opacity-0 group-hover:opacity-100 hover:text-blue-400 transition-opacity"><Edit2 size={12}/></span>)}{cat !== 'All' && selectedCategory === cat && (<span onClick={(e) => {e.stopPropagation(); handleDeleteCategoryRequest(cat)}} className="ml-2 text-theme-muted hover:text-red-500 transition-colors"><Trash2 size={12}/></span>)}</>)}</button>))}
+                        {isAddingCategory ? (<input autoFocus className="ml-2 px-2 py-1 bg-theme-element border border-purple-500 rounded text-sm text-theme-main outline-none w-24" placeholder="Name..." value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} onBlur={handleFinishAddCategory} onKeyDown={(e) => e.key === 'Enter' && handleFinishAddCategory()} />) : (<button onClick={handleStartAddCategory} className="px-3 py-3 text-theme-muted hover:text-theme-main hover:bg-theme-element transition"><Plus size={16} /></button>)}
+                    </div>
+                    <div className="p-4 pb-32 overflow-y-auto tab-scroll flex-1 bg-theme-main">
+                        <div className="grid gap-3">
+                            {getDisplayedExercises().map((ex, i) => (
+                                <ExerciseItem 
+                                    key={ex._cat + ex._idx} exercise={ex} idx={ex._idx} catName={ex._cat}
+                                    onAdd={mode === 'pick' ? onAddStep : null} onModify={handleOpenModify} onMove={handleOpenMove} onDelete={handleDeleteExerciseRequest}
+                                    draggable={!searchTerm && selectedCategory !== 'All'} onDragStart={(e) => handleDragStart(e, ex._cat, ex._idx)} onDragOver={handleDragOver} onDrop={(e) => handleDropOnItem(e, ex._cat, ex._idx)}
+                                />
+                            ))}
+                            {getDisplayedExercises().length === 0 && (<div className="text-center py-10 text-theme-muted italic">No exercises found.</div>)}
+                        </div>
+                    </div>
+                    <div className="p-4 border-t border-theme bg-theme-card text-center"><button onClick={handleAddNewExercise} className="text-sm text-theme-muted hover:text-theme-main underline">+ Add new exercise to "{selectedCategory === 'All' ? Object.keys(library)[0] : selectedCategory}"</button></div>
+                    {editModal && (<EditExerciseModal exercise={editModal.ex} originalCategory={editModal.cat} categories={Object.keys(library)} onSave={handleSaveModify} onCancel={() => setEditModal(null)} />)}
+                    {moveModal && (<MoveExerciseModal currentCategory={moveModal.currentCat} categories={Object.keys(library)} onMove={handleConfirmMove} onCancel={() => setMoveModal(null)} />)}
+                    {deleteModal && (<DeleteConfirmModal itemTitle={deleteModal.name} isCategory={deleteModal.type === 'category'} onConfirm={deleteModal.type === 'category' ? confirmDeleteCategory : confirmDeleteExercise} onCancel={() => setDeleteModal(null)} />)}
+                </div>
+            );
+        };
+
+        const RoutineBuilder = ({ initialRoutine, library, onSave, onCancel, onUpdateLibrary }) => {
+            const [title, setTitle] = useState(initialRoutine ? initialRoutine.title : '');
+            const [desc, setDesc] = useState(initialRoutine ? initialRoutine.description : '');
+            const [steps, setSteps] = useState(initialRoutine ? initialRoutine.steps : []);
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const addStep = (exercise) => { setSteps([...steps, { ...exercise, id: Date.now() }]); setIsModalOpen(false); };
+            const removeStep = (index) => { const newSteps = [...steps]; newSteps.splice(index, 1); setSteps(newSteps); };
+            const moveStep = (index, direction) => { const newSteps = [...steps]; if (direction === -1 && index > 0) { [newSteps[index], newSteps[index - 1]] = [newSteps[index - 1], newSteps[index]]; } else if (direction === 1 && index < newSteps.length - 1) { [newSteps[index], newSteps[index + 1]] = [newSteps[index + 1], newSteps[index]]; } setSteps(newSteps); };
+            const updateStepDuration = (index, newDuration) => { const newSteps = [...steps]; newSteps[index] = { ...newSteps[index], duration: newDuration }; setSteps(newSteps); };
+            const handleSave = () => { if (!title) return alert("Please enter a routine title."); if (steps.length === 0) return alert("Add at least one exercise."); const totalDuration = steps.reduce((acc, s) => acc + (parseInt(s.duration) || 0), 0); let icon = 'BatteryCharging'; let color = 'text-emerald-400'; if (totalDuration >= 45) { icon = 'Zap'; color = 'text-blue-400'; } if (totalDuration >= 90) { icon = 'Flame'; color = 'text-purple-400'; } onSave({ id: initialRoutine ? initialRoutine.id : `custom-${Date.now()}`, title, description: desc || 'Custom Routine', duration: totalDuration, steps, color, icon, isCustom: true }); };
+            return (
+                <div className="max-w-6xl mx-auto animate-fade-in pb-20">
+                    <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-theme-main">{initialRoutine ? 'Edit Routine' : 'Create New Routine'}</h2><button onClick={onCancel} className="text-theme-muted hover:text-theme-main">Cancel</button></div>
+                    <div className="grid md:grid-cols-12 gap-6">
+                        <div className="md:col-span-4 space-y-4">
+                            <div><label className="block text-xs text-theme-muted uppercase tracking-widest mb-1">Title</label><input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-theme-card border border-theme rounded-lg p-3 text-theme-main focus:border-purple-500 outline-none" placeholder="Ex: Sunday Shred" /></div>
+                            <div><label className="block text-xs text-theme-muted uppercase tracking-widest mb-1">Description</label><textarea value={desc} onChange={e => setDesc(e.target.value)} className="w-full bg-theme-card border border-theme rounded-lg p-3 text-theme-main focus:border-purple-500 outline-none h-24 resize-none" placeholder="Session goals..." /></div>
+                            <div className="p-4 bg-theme-card rounded-lg border border-theme text-center"><div className="text-2xl font-mono font-bold text-theme-main">{steps.reduce((acc, s) => acc + (parseInt(s.duration) || 0), 0)} min</div><div className="text-xs text-theme-muted uppercase">Total Duration</div></div>
+                            <button onClick={handleSave} className="w-full bg-theme-main text-theme-main border border-theme font-bold py-3 rounded-lg hover:bg-theme-element transition shadow-sm">Save Routine</button>
+                            <div className="mt-6 bg-blue-900/10 border border-blue-800/30 p-5 rounded-xl"><h4 className="text-blue-400 font-bold text-sm mb-3 flex items-center"><Icon size={16} className="mr-2"><Info/></Icon> Strategic Blueprint</h4><div className="text-xs text-theme-muted space-y-3"><p>Structure advice: Warm-up (5-10m) -> Technique -> Application -> Cool-down.</p></div></div>
+                        </div>
+                        <div className="md:col-span-8 bg-theme-card/50 border border-theme rounded-xl p-4 flex flex-col h-[600px]">
+                            <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-bold text-theme-muted uppercase">Exercise Sequence</h3><button onClick={() => setIsModalOpen(true)} className="flex items-center text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg transition"><Plus size={14} className="mr-1" /> Add Exercise</button></div>
+                            <div className="space-y-2 overflow-y-auto pr-2 tab-scroll flex-grow">
+                                {steps.length === 0 && (<div className="h-full flex flex-col items-center justify-center text-theme-muted border-2 border-dashed border-theme rounded-lg p-10"><p>No exercises added.</p></div>)}
+                                {steps.map((step, idx) => (<div key={step.id || idx} className="flex items-center bg-theme-card p-3 rounded-lg border border-theme group hover:border-zinc-500 transition"><div className="flex flex-col mr-3 text-theme-muted"><button onClick={() => moveStep(idx, -1)} className="hover:text-theme-main"><ArrowUp size={14} /></button><button onClick={() => moveStep(idx, 1)} className="hover:text-theme-main"><ArrowDown size={14} /></button></div><div className="flex-1 min-w-0"><div className="text-theme-main text-sm font-semibold truncate">{step.title}</div><div className="flex items-center gap-2 mt-1"><div className="flex items-center bg-theme-element border border-theme rounded px-1"><input type="number" min="1" max="120" value={step.duration} onChange={(e) => updateStepDuration(idx, parseInt(e.target.value) || 0)} className="w-10 bg-transparent text-xs text-theme-main focus:outline-none text-center py-1"/><span className="text-theme-muted text-xs pr-1">min</span></div><span className="text-theme-muted text-xs">• {step.type}</span></div></div><button onClick={() => removeStep(idx)} className="text-theme-muted hover:text-red-400 p-2 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button></div>))}
+                            </div>
+                        </div>
+                    </div>
+                    {isModalOpen && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}><div className="bg-theme-card w-full max-w-2xl rounded-2xl border border-theme shadow-2xl overflow-hidden flex flex-col max-h-[80vh]" onClick={(e) => e.stopPropagation()}><LibraryManager library={library} onUpdateLibrary={onUpdateLibrary} onAddStep={addStep} mode="pick" onClose={() => setIsModalOpen(false)} /></div></div>)}
+                </div>
+            );
+        };
+
+        const SessionView = ({ routine, onBack, onComplete, onPrev }) => {
+            const [stepIndex, setStepIndex] = useState(0);
+            const [timeLeft, setTimeLeft] = useState(routine.steps[0].duration * 60);
+            const [isActive, setIsActive] = useState(false);
+            const [notes, setNotes] = useState({});
+            const currentStep = routine.steps[stepIndex];
+            const isLastStep = stepIndex === routine.steps.length - 1;
+            useEffect(() => { let interval = null; if (isActive && timeLeft > 0) { interval = setInterval(() => { setTimeLeft(timeLeft => timeLeft - 1); }, 1000); } else if (timeLeft === 0) { setIsActive(false); } return () => clearInterval(interval); }, [isActive, timeLeft]);
+            useEffect(() => { setTimeLeft(currentStep.duration * 60); setIsActive(false); }, [stepIndex]);
+            const formatTime = (seconds) => { const mins = Math.floor(seconds / 60); const secs = seconds % 60; return `${mins}:${secs < 10 ? '0' : ''}${secs}`; };
+            const handleNext = () => { if (isLastStep) { onComplete(notes); } else { setStepIndex(prev => prev + 1); } };
+            const handleNoteChange = (e) => { setNotes({ ...notes, [stepIndex]: e.target.value }); };
+            const progress = ((stepIndex) / routine.steps.length) * 100;
+            return (
+                <div className="max-w-3xl mx-auto animate-fade-in pb-20">
+                    <div className="flex items-center mb-8"><button onClick={onBack} className="flex items-center text-theme-muted hover:text-theme-main transition"><ChevronLeft size={20} className="mr-1" /> Stop</button><div className="ml-auto text-theme-muted font-mono text-sm">Block {stepIndex + 1}/{routine.steps.length}</div></div>
+                    <div className="w-full bg-theme-element h-2 rounded-full mb-8 overflow-hidden"><div className="bg-gradient-to-r from-blue-500 to-purple-500 h-full transition-all duration-500" style={{ width: `${progress}%` }}></div></div>
+                    <div className="bg-theme-card border border-theme rounded-2xl p-8 mb-6 shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                        <div className="flex flex-col md:flex-row justify-between items-center relative z-10"><div className="text-center md:text-left mb-6 md:mb-0 max-w-md"><span className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-3 bg-theme-element text-theme-muted uppercase">{currentStep.type}</span><h2 className="text-3xl font-bold text-theme-main mb-2">{currentStep.title}</h2><p className="text-theme-muted">{currentStep.desc}</p></div><div className="flex flex-col items-center"><div className={`text-6xl font-mono font-bold tracking-tighter mb-4 ${timeLeft < 60 ? 'text-red-500 animate-pulse' : 'text-theme-main'}`}>{formatTime(timeLeft)}</div><div className="flex gap-4"><button onClick={onPrev} disabled={stepIndex === 0} className={`p-4 rounded-full transition-all ${stepIndex === 0 ? 'opacity-50 cursor-not-allowed bg-theme-element text-theme-muted' : 'bg-theme-element text-theme-muted hover:bg-theme-hover hover:text-theme-main'}`}><SkipBack /></button><button onClick={() => setIsActive(!isActive)} className={`p-4 rounded-full transition-all ${isActive ? 'bg-theme-element text-theme-muted hover:bg-theme-hover' : 'bg-theme-main text-theme-main hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.3)] border border-theme'}`}>{isActive ? <Pause fill="currentColor" /> : <Play fill="currentColor" />}</button><button onClick={handleNext} className="p-4 rounded-full bg-theme-element text-theme-muted hover:bg-theme-hover hover:text-theme-main transition-all"><SkipForward /></button></div></div></div>
+                        {currentStep.tab && (<div className="mt-8 bg-theme-element rounded-lg p-4 border border-theme"><div className="text-xs text-theme-muted mb-2 font-mono uppercase tracking-widest">Tablatura</div><pre className="font-mono text-sm text-emerald-400 overflow-x-auto tab-scroll pb-2 whitespace-pre leading-relaxed">{currentStep.tab}</pre></div>)}
+                    </div>
+                    <div className="bg-theme-card/50 border border-theme rounded-xl p-6"><label className="flex items-center text-sm font-semibold text-theme-muted mb-3"><Save size={16} className="mr-2" /> Session Notes</label><textarea value={notes[stepIndex] || ''} onChange={handleNoteChange} placeholder="Ex: Reached 120bpm clean..." className="w-full bg-theme-element border border-theme rounded-lg p-4 text-theme-main focus:outline-none focus:border-purple-500 transition-colors h-24 resize-none"></textarea></div>
+                </div>
+            );
+        };
+
+        const SummaryView = ({ routine, notes, onReset }) => {
+            const downloadTxt = () => { let content = `SESSION REPORT: ${routine.title}\nDATE: ${new Date().toLocaleDateString()}\n----------------------------\n\n`; routine.steps.forEach((step, index) => { content += `[${step.title}]\n`; content += `Note: ${notes[index] || 'No notes'}\n\n`; }); const element = document.createElement("a"); const file = new Blob([content], {type: 'text/plain'}); element.href = URL.createObjectURL(file); element.download = `Session_${new Date().toISOString().slice(0,10)}.txt`; document.body.appendChild(element); element.click(); };
+            return (
+                <div className="max-w-2xl mx-auto text-center py-10 animate-fade-in pb-20">
+                    <div className="w-20 h-20 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle size={40} /></div><h2 className="text-4xl font-bold text-theme-main mb-4">Session Completed!</h2><p className="text-theme-muted mb-10">Great work on "{routine.title}".</p><div className="flex gap-4 justify-center"><button onClick={onReset} className="px-6 py-3 rounded-lg bg-theme-element text-theme-main hover:bg-theme-hover transition">Back to Home</button><button onClick={downloadTxt} className="px-6 py-3 rounded-lg bg-theme-main text-theme-main border border-theme font-bold hover:bg-theme-element transition flex items-center"><Download size={18} className="mr-2" /> Download Report</button></div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [view, setView] = useState('HOME');
+            const [routines, setRoutines] = useState(DEFAULT_ROUTINES);
+            const [library, setLibrary] = useState(INITIAL_EXERCISE_LIBRARY);
+            const [activeRoutine, setActiveRoutine] = useState(null);
+            const [sessionNotes, setSessionNotes] = useState(null);
+            const [editingRoutine, setEditingRoutine] = useState(null);
+            const [showResetModal, setShowResetModal] = useState(false);
+            const [isDarkMode, setIsDarkMode] = useState(true);
+            const [isMetronomeOpen, setIsMetronomeOpen] = useState(false);
+            
+            // New state to track if a session is actively running
+            const [sessionActive, setSessionActive] = useState(false);
+            const [logContent, setLogContent] = useState('');
+            const [sessionHistory, setSessionHistory] = useState([]);
+
+            // Session State (Lifted Up)
+            const [sessionTimerActive, setSessionTimerActive] = useState(false);
+            const [sessionTimeLeft, setSessionTimeLeft] = useState(0);
+            const [sessionStepIndex, setSessionStepIndex] = useState(0);
+            const [sessionNotesMap, setSessionNotesMap] = useState({});
+
+            // Load saved data
+            useEffect(() => {
+                const savedRoutines = localStorage.getItem('guitarApp_allRoutines');
+                if (savedRoutines) { try { setRoutines(JSON.parse(savedRoutines)); } catch(e) { console.error(e); } }
+                const savedLibrary = localStorage.getItem('guitarApp_library');
+                if (savedLibrary) { try { setLibrary(JSON.parse(savedLibrary)); } catch(e) { console.error(e); } }
+                const savedTheme = localStorage.getItem('guitarApp_theme');
+                if (savedTheme) { 
+                    setIsDarkMode(savedTheme === 'dark'); 
+                    if (savedTheme === 'light') document.body.classList.add('light-mode');
+                }
+                const savedLog = localStorage.getItem('guitarApp_log');
+                if (savedLog) setLogContent(savedLog);
+                const savedHistory = localStorage.getItem('guitarApp_sessionHistory');
+                if (savedHistory) { try { setSessionHistory(JSON.parse(savedHistory)); } catch(e) { console.error(e); } }
+            }, []);
+
+            const toggleTheme = () => {
+                const newMode = !isDarkMode;
+                setIsDarkMode(newMode);
+                if (newMode) {
+                    document.body.classList.remove('light-mode');
+                    localStorage.setItem('guitarApp_theme', 'dark');
+                } else {
+                    document.body.classList.add('light-mode');
+                    localStorage.setItem('guitarApp_theme', 'light');
+                }
+            };
+
+            const persistRoutines = (updatedRoutines) => { setRoutines(updatedRoutines); localStorage.setItem('guitarApp_allRoutines', JSON.stringify(updatedRoutines)); };
+            const persistLibrary = (updatedLibrary) => { setLibrary(updatedLibrary); localStorage.setItem('guitarApp_library', JSON.stringify(updatedLibrary)); }
+            const saveRoutine = (newRoutine) => { const updatedRoutines = { ...routines, [newRoutine.id]: newRoutine }; persistRoutines(updatedRoutines); setView('HOME'); };
+            const deleteRoutine = (routineId) => { if(confirm("Are you sure you want to delete this routine?")) { const updatedRoutines = { ...routines }; delete updatedRoutines[routineId]; persistRoutines(updatedRoutines); } };
+            const confirmReset = () => { persistRoutines(DEFAULT_ROUTINES); persistLibrary(INITIAL_EXERCISE_LIBRARY); setShowResetModal(false); };
+            
+            const handleViewChange = (newView) => {
+                setView(newView);
+            };
+
+            const goToPreview = (routine) => { setActiveRoutine(routine); setView('PREVIEW'); };
+            const goToLibrary = () => { setView('LIBRARY'); };
+            
+            const startSession = () => { 
+                // Initialize Session
+                setSessionActive(true); // START THE SESSION STATE
+                setSessionStepIndex(0);
+                setSessionTimeLeft(activeRoutine.steps[0].duration * 60);
+                setSessionNotesMap({});
+                setSessionTimerActive(false);
+                setView('SESSION'); 
+            };
+            
+            const stopSession = () => {
+                setSessionActive(false); // STOP THE SESSION STATE
+                setSessionTimerActive(false);
+                setActiveRoutine(null);
+                setView('HOME');
+            };
+            
+            const handleSessionNext = () => {
+                if (sessionStepIndex === activeRoutine.steps.length - 1) {
+                    completeSession(sessionNotesMap);
+                } else {
+                    const nextIndex = sessionStepIndex + 1;
+                    setSessionStepIndex(nextIndex);
+                    setSessionTimeLeft(activeRoutine.steps[nextIndex].duration * 60);
+                    setSessionTimerActive(false);
+                }
+            };
+
+            const handleSessionPrev = () => {
+                if (sessionStepIndex > 0) {
+                    const prevIndex = sessionStepIndex - 1;
+                    setSessionStepIndex(prevIndex);
+                    setSessionTimeLeft(activeRoutine.steps[prevIndex].duration * 60);
+                    setSessionTimerActive(false);
+                }
+            };
+
+            const completeSession = (notes) => { 
+                setSessionNotes(notes); 
+                
+                // Create History Entry
+                const newEntry = {
+                    id: Date.now(),
+                    date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString(),
+                    routineTitle: activeRoutine.title,
+                    notes: notes,
+                    steps: activeRoutine.steps 
+                };
+                
+                const updatedHistory = [newEntry, ...sessionHistory];
+                setSessionHistory(updatedHistory);
+                localStorage.setItem('guitarApp_sessionHistory', JSON.stringify(updatedHistory));
+
+                setSessionActive(false); // Session finished
+                setView('SUMMARY'); 
+                setActiveRoutine(null); 
+                setSessionTimerActive(false);
+            };
+
+            const updateLog = (newContent) => {
+                setLogContent(newContent);
+                localStorage.setItem('guitarApp_log', newContent);
+            };
+
+            const openBuilder = (routineToEdit = null) => { setEditingRoutine(routineToEdit); setView('BUILDER'); };
+
+            // Modified rendering to support persistent session
+            const renderContent = () => {
+                const isSessionView = view === 'SESSION';
+                
+                // Content for non-session views
+                const mainContent = (() => {
+                    switch(view) {
+                        case 'HOME':
+                            return (
+                                <div className="max-w-6xl mx-auto animate-fade-in pb-20 p-6 md:p-12">
+                                    <header className="mb-12 text-center">
+                                        <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-500 mb-4 tracking-tight">THE ECLECTIC VIRTUOSO</h1>
+                                        <p className="text-theme-muted text-lg">Select, modify, or create your practice protocol.</p>
+                                    </header>
+                                    <div className="grid md:grid-cols-4 gap-6 mb-8">
+                                        {Object.values(routines).map(routine => (
+                                            <RoutineCard key={routine.id} routine={routine} onClick={() => goToPreview(routine)} onEdit={openBuilder} onDelete={deleteRoutine} />
+                                        ))}
+                                        <div onClick={() => openBuilder(null)} className="border-2 border-dashed border-theme rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer hover:border-purple-500 hover:bg-theme-element transition group min-h-[200px]">
+                                            <div className="w-12 h-12 rounded-full bg-theme-element flex items-center justify-center mb-3 group-hover:bg-purple-600 transition"><Plus className="text-theme-muted group-hover:text-white" /></div>
+                                            <h3 className="text-theme-main font-bold group-hover:text-white">Create Routine</h3>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        case 'LIBRARY':
+                            return (
+                                <div className="h-full bg-theme-main animate-fade-in flex flex-col">
+                                    <LibraryManager library={library} onUpdateLibrary={persistLibrary} mode="manage" onClose={() => setView('HOME')} />
+                                </div>
+                            );
+                        case 'LOG':
+                            return <LogView content={logContent} onChange={updateLog} history={sessionHistory} />;
+                        case 'METRONOME':
+                            return <PlaceholderView title="Metronome" icon={Watch} />;
+                        case 'SETTINGS':
+                            return <SettingsView onReset={() => setShowResetModal(true)} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />;
+                        case 'PREVIEW':
+                            return activeRoutine && <div className="p-6 md:p-12"><RoutinePreview routine={activeRoutine} onStart={startSession} onBack={() => setView('HOME')} onEdit={() => openBuilder(activeRoutine)} /></div>;
+                        case 'SESSION':
+                            // Session logic moved to Persistent Session View below
+                            return null; 
+                        case 'SUMMARY':
+                            return activeRoutine && <div className="p-6 md:p-12"><SummaryView routine={activeRoutine} notes={sessionNotes} onReset={() => setView('HOME')} /></div>; // Note: activeRoutine is cleared in completeSession, handle this
+                        case 'BUILDER':
+                            return <div className="p-6 md:p-12"><RoutineBuilder initialRoutine={editingRoutine} library={library} onUpdateLibrary={persistLibrary} onSave={saveRoutine} onCancel={() => setView('HOME')} /></div>;
+                        default:
+                            return null;
+                    }
+                })();
+
+                // Special handling for Summary view since activeRoutine is cleared
+                if (view === 'SUMMARY') {
+                    // Re-use last active routine or pass props differently. 
+                    // For simplicity, let's keep activeRoutine until summary is dismissed.
+                    // Actually, completeSession clears it. Let's fix completeSession.
+                    // Fixed: activeRoutine set to null ONLY when leaving summary.
+                    // But wait, completeSession sets activeRoutine to null.
+                    // Let's create a temp state for summary routine.
+                    return <div className="p-6 md:p-12"><SummaryView routine={activeRoutine || {title: 'Session'}} notes={sessionNotes} onReset={() => { setActiveRoutine(null); setView('HOME'); }} /></div>;
+                }
+
+                return (
+                    <>
+                        {/* 1. Main Content (Home, Library, etc) - visible when NOT in session view */}
+                        <div className={isSessionView ? 'hidden' : 'block h-full overflow-y-auto'}>
+                            {mainContent}
+                        </div>
+
+                        {/* 2. Persistent Session View - always mounted if active, visible only when view is SESSION */}
+                        {activeRoutine && view !== 'SUMMARY' && (
+                            <div className={isSessionView ? 'block h-full overflow-y-auto p-6 md:p-12' : 'hidden'}>
+                                {/* Inline SessionView using props from App state */}
+                                <div className="max-w-3xl mx-auto animate-fade-in pb-20">
+                                    <div className="flex items-center mb-8"><button onClick={stopSession} className="flex items-center text-theme-muted hover:text-theme-main transition"><ChevronLeft size={20} className="mr-1" /> Stop</button><div className="ml-auto text-theme-muted font-mono text-sm">Block {sessionStepIndex + 1}/{activeRoutine.steps.length}</div></div>
+                                    <div className="w-full bg-theme-element h-2 rounded-full mb-8 overflow-hidden"><div className="bg-gradient-to-r from-blue-500 to-purple-500 h-full transition-all duration-500" style={{ width: `${((sessionStepIndex) / activeRoutine.steps.length) * 100}%` }}></div></div>
+                                    <div className="bg-theme-card border border-theme rounded-2xl p-8 mb-6 shadow-2xl relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                                        <div className="flex flex-col md:flex-row justify-between items-center relative z-10">
+                                            <div className="text-center md:text-left mb-6 md:mb-0 max-w-md">
+                                                <span className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-3 bg-theme-element text-theme-muted uppercase">{activeRoutine.steps[sessionStepIndex].type}</span>
+                                                <h2 className="text-3xl font-bold text-theme-main mb-2">{activeRoutine.steps[sessionStepIndex].title}</h2>
+                                                <p className="text-theme-muted">{activeRoutine.steps[sessionStepIndex].desc}</p>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <div className={`text-6xl font-mono font-bold tracking-tighter mb-4 ${sessionTimeLeft < 60 ? 'text-red-500 animate-pulse' : 'text-theme-main'}`}>
+                                                    {(() => { const m = Math.floor(sessionTimeLeft / 60); const s = sessionTimeLeft % 60; return `${m}:${s < 10 ? '0' : ''}${s}`; })()}
+                                                </div>
+                                                <div className="flex gap-4">
+                                                    <button onClick={handleSessionPrev} disabled={sessionStepIndex === 0} className={`p-4 rounded-full transition-all ${sessionStepIndex === 0 ? 'opacity-50 cursor-not-allowed bg-theme-element text-theme-muted' : 'bg-theme-element text-theme-muted hover:bg-theme-hover hover:text-theme-main'}`}><SkipBack /></button>
+                                                    <button onClick={() => setSessionTimerActive(!sessionTimerActive)} className={`p-4 rounded-full transition-all ${sessionTimerActive ? 'bg-theme-element text-theme-muted hover:bg-theme-hover' : 'bg-theme-main text-theme-main hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.3)] border border-theme'}`}>{sessionTimerActive ? <Pause fill="currentColor" /> : <Play fill="currentColor" />}</button>
+                                                    <button onClick={handleSessionNext} className="p-4 rounded-full bg-theme-element text-theme-muted hover:bg-theme-hover hover:text-theme-main transition-all"><SkipForward /></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {activeRoutine.steps[sessionStepIndex].tab && (<div className="mt-8 bg-theme-element rounded-lg p-4 border border-theme"><div className="text-xs text-theme-muted mb-2 font-mono uppercase tracking-widest">Tablatura</div><pre className="font-mono text-sm text-emerald-400 overflow-x-auto tab-scroll pb-2 whitespace-pre leading-relaxed">{activeRoutine.steps[sessionStepIndex].tab}</pre></div>)}
+                                    </div>
+                                    <div className="bg-theme-card/50 border border-theme rounded-xl p-6"><label className="flex items-center text-sm font-semibold text-theme-muted mb-3"><Save size={16} className="mr-2" /> Session Notes</label><textarea value={sessionNotesMap[sessionStepIndex] || ''} onChange={(e) => setSessionNotesMap({...sessionNotesMap, [sessionStepIndex]: e.target.value})} placeholder="Ex: Reached 120bpm clean..." className="w-full bg-theme-element border border-theme rounded-lg p-4 text-theme-main focus:outline-none focus:border-purple-500 transition-colors h-24 resize-none"></textarea></div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3. Mini Player - Visible ONLY if session is running AND we are navigating elsewhere (not session view, not summary) */}
+                        {sessionActive && activeRoutine && !isSessionView && view !== 'SUMMARY' && (
+                            <MiniPlayer routine={activeRoutine} timeLeft={sessionTimeLeft} onResume={() => setView('SESSION')} />
+                        )}
+                    </>
+                );
+            };
+
+            return (
+                <div className="flex flex-col h-screen bg-theme-main text-theme-main transition-colors duration-300">
+                    <main className="flex-grow overflow-hidden relative">
+                        {renderContent()}
+                    </main>
+
+                    {/* Metronome Overlay Widget */}
+                    <MetronomeWidget isOpen={isMetronomeOpen} onClose={() => setIsMetronomeOpen(false)} />
+
+                    <BottomNav 
+                        activeView={view} 
+                        onViewChange={handleViewChange} 
+                        isMetronomeOpen={isMetronomeOpen}
+                        onToggleMetronome={() => setIsMetronomeOpen(!isMetronomeOpen)}
+                    />
+
+                    {showResetModal && (
+                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
+                            <div className="bg-theme-card border border-theme rounded-xl p-6 max-w-md w-full shadow-2xl animate-fade-in">
+                                <div className="flex items-center text-red-500 mb-4"><AlertTriangle size={32} className="mr-3"/><h3 className="text-xl font-bold text-theme-main">Reset Everything?</h3></div>
+                                <p className="text-theme-muted mb-6 leading-relaxed">Warning: This action will <strong>permanently delete</strong> all your custom routines and modifications. The application will revert to factory defaults.</p>
+                                <div className="flex gap-3 justify-end">
+                                    <button onClick={() => setShowResetModal(false)} className="px-4 py-2 text-theme-muted hover:text-theme-main transition">Cancel</button>
+                                    <button onClick={confirmReset} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition">Confirm Reset</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
