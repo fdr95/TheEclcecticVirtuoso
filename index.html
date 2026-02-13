@@ -1,6 +1,6 @@
 <!-- 
   THE ECLECTIC VIRTUOSO - Practice Companion App
-  Copyright (c) 2024 [Inserisci Qui Il Tuo Nome]
+  Copyright (c) 2026 Federico Verdicchio
   All rights reserved.
   
   This software is proprietary and confidential. 
@@ -967,6 +967,20 @@ E|-----------------------------------|`;
 
             const persistRoutines = (updatedRoutines) => { setRoutines(updatedRoutines); localStorage.setItem('guitarApp_allRoutines', JSON.stringify(updatedRoutines)); };
             const persistLibrary = (updatedLibrary) => { setLibrary(updatedLibrary); localStorage.setItem('guitarApp_library', JSON.stringify(updatedLibrary)); }
+            
+            // Session Timer Logic
+            useEffect(() => {
+                let interval = null;
+                if (sessionTimerActive && sessionTimeLeft > 0) {
+                    interval = setInterval(() => {
+                        setSessionTimeLeft(prev => prev - 1);
+                    }, 1000);
+                } else if (sessionTimeLeft === 0) {
+                    setSessionTimerActive(false);
+                }
+                return () => clearInterval(interval);
+            }, [sessionTimerActive, sessionTimeLeft]);
+
             const saveRoutine = (newRoutine) => { const updatedRoutines = { ...routines, [newRoutine.id]: newRoutine }; persistRoutines(updatedRoutines); setView('HOME'); };
             const deleteRoutine = (routineId) => { if(confirm("Are you sure you want to delete this routine?")) { const updatedRoutines = { ...routines }; delete updatedRoutines[routineId]; persistRoutines(updatedRoutines); } };
             const confirmReset = () => { persistRoutines(DEFAULT_ROUTINES); persistLibrary(INITIAL_EXERCISE_LIBRARY); setShowResetModal(false); };
