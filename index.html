@@ -10,7 +10,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>The Eclectic Virtuoso - Practice Companion</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -56,7 +56,7 @@
             font-family: 'Inter', sans-serif; 
             background-color: var(--bg-main); 
             color: var(--text-main); 
-            overflow: hidden;
+            overflow: hidden; /* App-like behavior */
             transition: background-color 0.3s, color 0.3s;
         }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
@@ -76,6 +76,12 @@
         .tab-scroll::-webkit-scrollbar-track { background: transparent; }
         .tab-scroll::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 4px; }
         
+        /* Dynamic Viewport Height for Mobile */
+        .h-dvh {
+            height: 100vh; /* Fallback */
+            height: 100dvh; /* Dynamic height */
+        }
+
         @keyframes fade-in {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -90,6 +96,9 @@
         .pulse-effect { animation: pulse-subtle 2s infinite; }
 
         .dragging { opacity: 0.5; border-color: var(--accent-purple); }
+        
+        /* Safe Area for iPhone X+ */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
 <body>
@@ -239,6 +248,7 @@ E|-----------------------------------|`;
 
         // --- COMPONENTS ---
         
+        // MiniPlayer Component
         const MiniPlayer = ({ routine, onResume, timeLeft }) => {
             const formatTime = (seconds) => {
                 const mins = Math.floor(seconds / 60);
@@ -372,6 +382,59 @@ E|-----------------------------------|`;
                     scheduler();
                 }
             };
+
+            // Keyboard shortcut for Spacebar
+            useEffect(() => {
+                if (!isOpen) return;
+
+                const handleKeyDown = (e) => {
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        // Access latest togglePlay via ref or just update state, 
+                        // but here we can just call the function since it's inside the component scope
+                        // However, to avoid stale closure issues if togglePlay wasn't depending on refs/state correctly,
+                        // we need to be careful. 
+                        // In this component, togglePlay uses refs for audio logic but `isPlaying` state for UI.
+                        // We can use a ref to track `isPlaying` for the event listener.
+                    }
+                };
+                
+                // For simplicity in this structure, let's just trigger the button click programmatically 
+                // or ensure togglePlay has access to latest state.
+                // Actually, since we re-render on isPlaying change, the effect will be re-bound if we add isPlaying to deps.
+            }, [isOpen]); 
+
+            // Better implementation of spacebar toggle using a ref to access latest isPlaying state without re-binding
+            const isPlayingRef = useRef(isPlaying);
+            useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
+            useEffect(() => {
+                if (!isOpen) return;
+                const handleKeyDown = (e) => {
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        // Toggle logic duplicated here to ensure access to latest refs
+                        if (isPlayingRef.current) {
+                            clearTimeout(timerIDRef.current);
+                            setIsPlaying(false);
+                            setCurrentBeat(-1);
+                        } else {
+                            if (!audioCtxRef.current) {
+                                audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                            }
+                            if (audioCtxRef.current.state === 'suspended') {
+                                audioCtxRef.current.resume();
+                            }
+                            setIsPlaying(true);
+                            currentBeatRef.current = 0;
+                            nextNoteTimeRef.current = audioCtxRef.current.currentTime + 0.05;
+                            scheduler();
+                        }
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [isOpen]); // Only re-bind when open state changes
 
             useEffect(() => {
                 return () => clearTimeout(timerIDRef.current);
@@ -719,12 +782,12 @@ E|-----------------------------------|`;
             };
             return (
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[110] p-4 animate-fade-in" onClick={onCancel}>
-                    <div className="bg-theme-card border border-theme rounded-xl p-6 w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh] flex flex-col h-auto" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-4">
+                    <div className="bg-theme-card border border-theme rounded-xl p-6 w-[95%] max-w-lg shadow-2xl flex flex-col h-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4 shrink-0">
                              <h3 className="text-xl font-bold text-theme-main">Modify Exercise</h3>
                              <button onClick={onCancel} className="text-theme-muted hover:text-theme-main"><X size={20}/></button>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-4 overflow-y-auto flex-1">
                             <div><label className="block text-xs text-theme-muted uppercase mb-1">Title</label><input className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" value={data.title} onChange={(e) => handleChange('title', e.target.value)} /></div>
                             <div><label className="block text-xs text-theme-muted uppercase mb-1">Category (Tab)</label>{!isNewCat ? (<div className="flex gap-2"><select className="flex-1 bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" value={selectedCategory} onChange={(e) => { if (e.target.value === '__NEW__') { setIsNewCat(true); } else { setSelectedCategory(e.target.value); } }}>{categories.filter(c => c !== 'All').map(c => (<option key={c} value={c}>{c}</option>))}<option value="__NEW__">+ Create New Category...</option></select></div>) : (<div className="flex gap-2"><input autoFocus className="flex-1 bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" placeholder="New Category Name" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} /><button onClick={() => setIsNewCat(false)} className="px-3 py-2 text-theme-muted hover:text-theme-main text-xs border border-theme rounded">Cancel</button></div>)}</div>
                             <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-theme-muted uppercase mb-1">Duration (min)</label><input type="number" className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" value={data.duration} onChange={(e) => handleChange('duration', parseInt(e.target.value))} /></div><div><label className="block text-xs text-theme-muted uppercase mb-1">Type</label><input className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" value={data.type} onChange={(e) => handleChange('type', e.target.value)} /></div></div>
@@ -732,7 +795,7 @@ E|-----------------------------------|`;
                             <div><label className="block text-xs text-theme-muted uppercase mb-1">Tab / Content</label><textarea className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main font-mono text-xs outline-none focus:border-purple-500 h-24 resize-none" value={data.tab || ''} onChange={(e) => handleChange('tab', e.target.value)} /></div>
                             <div><label className="block text-xs text-theme-muted uppercase mb-1">Image URL (Optional)</label><input className="w-full bg-theme-element border border-theme rounded p-2 text-theme-main outline-none focus:border-purple-500" value={data.imageUrl || ''} placeholder="https://..." onChange={(e) => handleChange('imageUrl', e.target.value)} /></div>
                         </div>
-                        <div className="flex justify-end gap-3 mt-6"><button onClick={onCancel} className="px-4 py-2 text-theme-muted hover:text-theme-main transition-colors">Cancel</button><button onClick={handleSaveClick} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded font-medium shadow-sm">Save Changes</button></div>
+                        <div className="flex justify-end gap-3 mt-6 shrink-0"><button onClick={onCancel} className="px-4 py-2 text-theme-muted hover:text-theme-main transition-colors">Cancel</button><button onClick={handleSaveClick} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded font-medium shadow-sm">Save Changes</button></div>
                     </div>
                 </div>
             );
@@ -774,7 +837,7 @@ E|-----------------------------------|`;
             return (
                 <div draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} className={`bg-theme-card p-4 rounded-lg border border-theme hover:border-zinc-500 hover:bg-theme-element cursor-pointer flex justify-between items-start transition group relative active:cursor-grabbing ${showMenu ? 'z-50' : 'z-0'}`}>
                     {draggable && (<div className="mr-3 text-theme-muted group-hover:text-theme-main cursor-grab active:cursor-grabbing pt-1"><GripVertical size={20} /></div>)}
-                    <div onClick={handleClick} className="flex-1 pr-4"><div className="text-theme-main font-semibold">{exercise.title}</div><div className="text-theme-muted text-sm">{exercise.desc}</div></div>
+                    <div onClick={handleClick} className="flex-1 pr-4 min-w-0"><div className="text-theme-main font-semibold truncate break-words">{exercise.title}</div><div className="text-theme-muted text-sm line-clamp-2 break-words">{exercise.desc}</div></div>
                     <div className="flex flex-col items-end gap-1"><div className="text-purple-400 font-mono text-sm whitespace-nowrap">{exercise.duration} min</div><div className="relative" ref={menuRef}><button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} className="p-1 text-theme-muted hover:text-theme-main rounded hover:bg-theme-element transition"><MoreVertical size={16} /></button>{showMenu && (<div className="absolute right-0 top-full mt-1 w-40 bg-theme-element border border-theme rounded shadow-xl z-[60] overflow-hidden"><button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onMove(exercise, catName, idx); }} className="w-full text-left px-3 py-2 text-xs text-theme-muted hover:bg-theme-hover hover:text-theme-main flex items-center"><ArrowUp className="mr-2 rotate-45" size={12} /> Move</button><button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onModify(exercise, catName, idx); }} className="w-full text-left px-3 py-2 text-xs text-theme-muted hover:bg-theme-hover hover:text-theme-main flex items-center"><Edit2 className="mr-2" size={12} /> Modify</button><button onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(catName, idx, exercise.title); }} className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-900/20 flex items-center"><Trash2 className="mr-2" size={12} /> Delete</button></div>)}</div></div>
                 </div>
             );
@@ -813,12 +876,12 @@ E|-----------------------------------|`;
 
             return (
                 <div className="flex flex-col h-full overflow-hidden relative">
-                    <div className="p-4 border-b border-theme flex justify-between items-center bg-theme-card gap-4">
+                    <div className="p-4 border-b border-theme flex justify-between items-center bg-theme-card gap-4 shrink-0">
                         <div className="flex items-center gap-2"><h3 className="text-lg font-bold text-theme-main whitespace-nowrap">Exercise Library</h3></div>
                         <div className="relative flex-1 max-w-md"><Icon size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-theme-muted"><Search/></Icon><input className="w-full bg-theme-element border border-theme rounded-full py-1.5 pl-10 pr-4 text-sm text-theme-main focus:outline-none focus:border-purple-500 transition-colors" placeholder="Search exercises..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/></div>
                         <button onClick={onClose} className="text-theme-muted hover:text-theme-main"><X size={20}/></button>
                     </div>
-                    <div className="flex border-b border-theme flex-wrap items-center px-2 bg-theme-card">
+                    <div className="flex border-b border-theme flex-wrap items-center px-2 bg-theme-card shrink-0">
                         <button onClick={() => setSelectedCategory('All')} className={`px-4 py-3 text-sm font-mono uppercase tracking-wider whitespace-nowrap flex items-center ${selectedCategory === 'All' ? 'text-theme-main border-b-2 border-purple-500 bg-theme-element' : 'text-theme-muted hover:text-theme-main'}`}><Icon size={16} className="mr-1"><Layers/></Icon> All</button>
                         {Object.keys(library).map(cat => (<button key={cat} onClick={() => setSelectedCategory(cat)} onDoubleClick={() => startRenameCategory(cat)} onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleDropOnTab(e, cat)} className={`px-4 py-3 text-sm font-mono uppercase tracking-wider whitespace-nowrap flex items-center group relative transition-colors ${selectedCategory === cat ? 'text-theme-main border-b-2 border-purple-500 bg-theme-element' : 'text-theme-muted hover:text-theme-main hover:bg-theme-element/50'}`}>{isEditingCategory === cat ? (<input autoFocus className="bg-transparent border-none outline-none text-theme-main w-20" value={editCategoryName} onChange={(e) => setEditCategoryName(e.target.value)} onBlur={finishRenameCategory} onKeyDown={(e) => e.key === 'Enter' && finishRenameCategory()} />) : (<>{cat}{selectedCategory === cat && (<span onClick={(e) => {e.stopPropagation(); startRenameCategory(cat)}} className="ml-2 opacity-0 group-hover:opacity-100 hover:text-blue-400 transition-opacity"><Edit2 size={12}/></span>)}{cat !== 'All' && selectedCategory === cat && (<span onClick={(e) => {e.stopPropagation(); handleDeleteCategoryRequest(cat)}} className="ml-2 text-theme-muted hover:text-red-500 transition-colors"><Trash2 size={12}/></span>)}</>)}</button>))}
                         {isAddingCategory ? (<input autoFocus className="ml-2 px-2 py-1 bg-theme-element border border-purple-500 rounded text-sm text-theme-main outline-none w-24" placeholder="Name..." value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} onBlur={handleFinishAddCategory} onKeyDown={(e) => e.key === 'Enter' && handleFinishAddCategory()} />) : (<button onClick={handleStartAddCategory} className="px-3 py-3 text-theme-muted hover:text-theme-main hover:bg-theme-element transition"><Plus size={16} /></button>)}
@@ -835,7 +898,7 @@ E|-----------------------------------|`;
                             {getDisplayedExercises().length === 0 && (<div className="text-center py-10 text-theme-muted italic">No exercises found.</div>)}
                         </div>
                     </div>
-                    <div className="p-4 border-t border-theme bg-theme-card text-center"><button onClick={handleAddNewExercise} className="text-sm text-theme-muted hover:text-theme-main underline">+ Add new exercise to "{selectedCategory === 'All' ? Object.keys(library)[0] : selectedCategory}"</button></div>
+                    <div className="p-4 border-t border-theme bg-theme-card text-center shrink-0"><button onClick={handleAddNewExercise} className="text-sm text-theme-muted hover:text-theme-main underline">+ Add new exercise to "{selectedCategory === 'All' ? Object.keys(library)[0] : selectedCategory}"</button></div>
                     {editModal && (<EditExerciseModal exercise={editModal.ex} originalCategory={editModal.cat} categories={Object.keys(library)} onSave={handleSaveModify} onCancel={() => setEditModal(null)} />)}
                     {moveModal && (<MoveExerciseModal currentCategory={moveModal.currentCat} categories={Object.keys(library)} onMove={handleConfirmMove} onCancel={() => setMoveModal(null)} />)}
                     {deleteModal && (<DeleteConfirmModal itemTitle={deleteModal.name} isCategory={deleteModal.type === 'category'} onConfirm={deleteModal.type === 'category' ? confirmDeleteCategory : confirmDeleteExercise} onCancel={() => setDeleteModal(null)} />)}
@@ -966,20 +1029,6 @@ E|-----------------------------------|`;
 
             const persistRoutines = (updatedRoutines) => { setRoutines(updatedRoutines); localStorage.setItem('guitarApp_allRoutines', JSON.stringify(updatedRoutines)); };
             const persistLibrary = (updatedLibrary) => { setLibrary(updatedLibrary); localStorage.setItem('guitarApp_library', JSON.stringify(updatedLibrary)); }
-            
-            // Session Timer Logic
-            useEffect(() => {
-                let interval = null;
-                if (sessionTimerActive && sessionTimeLeft > 0) {
-                    interval = setInterval(() => {
-                        setSessionTimeLeft(prev => prev - 1);
-                    }, 1000);
-                } else if (sessionTimeLeft === 0) {
-                    setSessionTimerActive(false);
-                }
-                return () => clearInterval(interval);
-            }, [sessionTimerActive, sessionTimeLeft]);
-
             const saveRoutine = (newRoutine) => { const updatedRoutines = { ...routines, [newRoutine.id]: newRoutine }; persistRoutines(updatedRoutines); setView('HOME'); };
             const deleteRoutine = (routineId) => { if(confirm("Are you sure you want to delete this routine?")) { const updatedRoutines = { ...routines }; delete updatedRoutines[routineId]; persistRoutines(updatedRoutines); } };
             const confirmReset = () => { persistRoutines(DEFAULT_ROUTINES); persistLibrary(INITIAL_EXERCISE_LIBRARY); setShowResetModal(false); };
